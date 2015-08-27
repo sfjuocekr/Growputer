@@ -25,12 +25,12 @@ float airHumids[10];
 float airTemps[10];
 float waterTemps[10];
 
-float deltaTime = 0;
-
 byte mac[6] = { 0xBE, 0xEF, 0xED, 0xC0, 0xFF, 0xEE };
 byte packetBuffer[NTP_PACKET_SIZE];
 
-unsigned int index = 0;
+float deltaTime = 0;
+
+unsigned char index = 0;
 
 bool inited = false;
 
@@ -173,7 +173,7 @@ time_t getNTP()
 
   sendNTPpacket(timeServer);
 
-  uint32_t beginWait = millis();
+  unsigned int beginWait = millis();
 
   while (millis() - beginWait < 1500)
   {
@@ -221,7 +221,7 @@ void sendNTPpacket(IPAddress &address)
 
 void read_sensors()
 {
-  float currentTime = millis();
+  unsigned short currentTime = millis();
 
   read_DHT22();
   read_DS18B20();
