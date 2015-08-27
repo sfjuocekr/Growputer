@@ -44,7 +44,7 @@ void setup()
   while (!Serial);
 
   Serial.flush();
-  Serial.println("Growputer v0.1 initializing . . .");
+  Serial.println("Growputer v0.1 initializing. . .");
   Serial.println();
 
   initHardware();
@@ -169,7 +169,7 @@ time_t getNTP()
 {
   while (udp.parsePacket() > 0);
 
-  Serial.println("      Transmiting NTP Request . . .");
+  Serial.println("      Transmiting NTP Request. . .");
 
   sendNTPpacket(timeServer);
 
@@ -221,7 +221,7 @@ void sendNTPpacket(IPAddress &address)
 
 void read_sensors()
 {
-  unsigned short currentTime = millis();
+  float currentTime = millis();
 
   read_DHT22();
   read_DS18B20();
