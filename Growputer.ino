@@ -97,7 +97,7 @@ bool init_W5100()
     return false;
   }
 
-  Serial.print("      IP address from DHCP: "); // static right now
+  Serial.print("      IP address from DHCP: ");
   Serial.println(Ethernet.localIP());
 
   return true;
@@ -263,3 +263,4 @@ void loop()
 {
   if (inited) read_sensors();
 }
+
