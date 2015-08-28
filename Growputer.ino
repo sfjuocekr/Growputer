@@ -3,6 +3,7 @@
 #include <DallasTemperature.h>
 #include <DS1307RTC.h>
 #include <Time.h>
+#include <TimeAlarms.h>
 #include <Wire.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
@@ -32,8 +33,6 @@ float deltaTime = 0;
 unsigned char index = 0;
 
 bool inited = false;
-
-tmElements_t tm;
 EthernetUDP udp;
 
 void setup()
@@ -50,7 +49,15 @@ void setup()
 
   Serial.println("Init: Done!");
   Serial.println();
+  
+  Alarm.timerRepeat(60, printStats);
+  
+  Alarm.alarmRepeat(6, 0, 0, lampOn);
+  Alarm.alarmRepeat(0, 0, 0, lampOff);
 
+  if (hour() >= 6) lampOn();
+  else lampOff();
+  
   inited = true;
 }
 
@@ -58,9 +65,9 @@ void initHardware()
 {
   init_DHT22();
   init_DS18B20();
-  init_DS1307();
 
   if (init_W5100()) init_NTP();
+  else setSyncProvider(RTC.get);
 }
 
 void init_DHT22()
@@ -75,14 +82,6 @@ void init_DS18B20()
   Serial.println("Init: DS18B20");
 
   sensors.begin();
-}
-
-bool init_DS1307()
-{
-  Serial.println("Init: DS1307");
-
-  if (RTC.read(tm)) return true;
-  else return false;
 }
 
 bool init_W5100()
@@ -126,26 +125,22 @@ void read_DS18B20()
 
 void readTime()
 {
-  while (!RTC.read(tm));
-
   Serial.print("");
-  print2digits(tm.Hour);
+  print2digits(hour());
   Serial.print(":");
-  print2digits(tm.Minute);
+  print2digits(minute());
   Serial.print(":");
-  print2digits(tm.Second);
+  print2digits(second());
 }
 
 void readDate()
 {
-  while (!RTC.read(tm));
-
   Serial.print("");
-  print2digits(tm.Day);
+  print2digits(day());
   Serial.print("-");
-  print2digits(tm.Month);
+  print2digits(month());
   Serial.print("-");
-  print2digits(tmYearToCalendar(tm.Year));
+  print2digits(year());
 }
 
 void print2digits(int number)
@@ -161,14 +156,14 @@ void init_NTP()
 
   udp.begin(LOCALPORT);
 
-  RTC.set(getNTP());
+  setSyncProvider(getNTP);
 }
 
 time_t getNTP()
 {
   while (udp.parsePacket() > 0);
 
-  Serial.println("      Transmitting NTP Request. . .");
+  Serial.println("      Transmitting NTP request. . .");
 
   sendNTPpacket(timeServer);
 
@@ -180,7 +175,7 @@ time_t getNTP()
 
     if (size >= NTP_PACKET_SIZE)
     {
-      Serial.println("      Received NTP Response!");
+      Serial.println("      Received NTP response!");
 
       udp.read(packetBuffer, NTP_PACKET_SIZE);
 
@@ -191,13 +186,15 @@ time_t getNTP()
       secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
       secsSince1900 |= (unsigned long)packetBuffer[43];
 
+      RTC.set(secsSince1900 - 2208988800UL);
+
       return secsSince1900 - 2208988800UL;
     }
   }
 
-  Serial.println("      No NTP Response :-(");
+  Serial.println("      No NTP response, using RTC value instead!");
 
-  return 0;
+  return RTC.get();
 }
 
 void sendNTPpacket(IPAddress &address)
@@ -237,28 +234,44 @@ void read_sensors()
     airTemps[0]   = (airTemps[0]   + airTemps[1]   + airTemps[2]   + airTemps[3]   + airTemps[4]   + airTemps[5]   + airTemps[6]   + airTemps[7]   + airTemps[8]   + airTemps[9])   / 10;
     waterTemps[0] = (waterTemps[0] + waterTemps[1] + waterTemps[2] + waterTemps[3] + waterTemps[4] + waterTemps[5] + waterTemps[6] + waterTemps[7] + waterTemps[8] + waterTemps[9]) / 10;
 
-    Serial.print("Air humidity: ");
-    Serial.println(airHumids[0]);
-    Serial.print("Air temperature: ");
-    Serial.println(airTemps[0]);
-    Serial.print("Water temperature: ");
-    Serial.println(waterTemps[0]);
-    Serial.print("Timestamp: ");
-    readDate();
-    Serial.print(" ");
-    readTime();
-    Serial.println();
-    Serial.println();
-    Serial.print("Procrastinated for ");
-    Serial.print(deltaTime / 1000);
-    Serial.println(" seconds!");
-    Serial.println();
-
     deltaTime = 0;
   }
 }
 
+void printStats()
+{
+  Serial.print("Air humidity: ");
+  Serial.println(airHumids[0]);
+  Serial.print("Air temperature: ");
+  Serial.println(airTemps[0]);
+  Serial.print("Water temperature: ");
+  Serial.println(waterTemps[0]);
+  Serial.print("Timestamp: ");
+  readDate();
+  Serial.print(" ");
+  readTime();
+  Serial.println();
+  Serial.println();
+}
+
+void lampOn()
+{
+  Serial.println("Lamp: ON");
+  Serial.println();
+}
+
+void lampOff()
+{
+  Serial.println("Lamp: OFF");
+  Serial.println();
+}
+
 void loop()
 {
-  if (inited) read_sensors();
+  if (inited)
+  {
+    read_sensors();
+    
+    Alarm.delay(1);
+  }
 }
