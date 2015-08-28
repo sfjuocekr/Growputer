@@ -163,7 +163,7 @@ time_t getNTP()
 {
   while (udp.parsePacket() > 0);
 
-  Serial.println("      Transmitting NTP request. . .");
+  Serial.println("NTP:  Transmitting NTP request. . .");
 
   sendNTPpacket(timeServer);
 
@@ -175,8 +175,9 @@ time_t getNTP()
 
     if (size >= NTP_PACKET_SIZE)
     {
-      Serial.println("      Received NTP response!");
-
+      Serial.println("NTP:  Received NTP response!");
+      Serial.println();
+      
       udp.read(packetBuffer, NTP_PACKET_SIZE);
 
       unsigned long secsSince1900;
@@ -192,8 +193,9 @@ time_t getNTP()
     }
   }
 
-  Serial.println("      No NTP response, using RTC value instead!");
-
+  Serial.println("NTP:  No response, using RTC value instead!");
+  Serial.println();
+    
   return RTC.get();
 }
 
