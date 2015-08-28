@@ -13,13 +13,12 @@
 #define ONE_WIRE_BUS 5
 #define TEMPERATURE_PRECISION 12
 #define NTP_PACKET_SIZE 48
-#define TIMEZONE 2
 #define LOCALPORT 123
 
 DHT dht(DHTPIN, DHTTYPE);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
-IPAddress timeServer(5, 101, 105, 6);
+IPAddress timeServer(132, 163, 4, 101);
 
 float airHumids[10];
 float airTemps[10];
@@ -169,7 +168,7 @@ time_t getNTP()
 {
   while (udp.parsePacket() > 0);
 
-  Serial.println("      Transmiting NTP Request. . .");
+  Serial.println("      Transmitting NTP Request. . .");
 
   sendNTPpacket(timeServer);
 
@@ -192,11 +191,11 @@ time_t getNTP()
       secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
       secsSince1900 |= (unsigned long)packetBuffer[43];
 
-      return secsSince1900 - 2208988800UL + TIMEZONE * SECS_PER_HOUR;
+      return secsSince1900 - 2208988800UL;
     }
   }
 
-  Serial.println("No NTP Response :-(");
+  Serial.println("      No NTP Response :-(");
 
   return 0;
 }
@@ -221,7 +220,7 @@ void sendNTPpacket(IPAddress &address)
 
 void read_sensors()
 {
-  float currentTime = millis();
+  unsigned long currentTime = millis();
 
   read_DHT22();
   read_DS18B20();
@@ -263,4 +262,3 @@ void loop()
 {
   if (inited) read_sensors();
 }
-
