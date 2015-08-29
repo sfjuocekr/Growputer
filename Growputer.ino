@@ -49,15 +49,16 @@ void setup()
 
   Serial.println("Init: Done!");
   Serial.println();
-  
+
+  Alarm.timerRepeat(2, read_sensors);
   Alarm.timerRepeat(60, printStats);
-  
+
   Alarm.alarmRepeat(6, 0, 0, lampOn);
   Alarm.alarmRepeat(0, 0, 0, lampOff);
 
   if (hour() >= 6) lampOn();
   else lampOff();
-  
+
   inited = true;
 }
 
@@ -65,9 +66,14 @@ void initHardware()
 {
   init_DHT22();
   init_DS18B20();
+  init_DS1307();
 
-  if (init_W5100()) init_NTP();
-  else setSyncProvider(RTC.get);
+  if (init_W5100())
+  {
+    init_NTP();
+
+    Alarm.timerRepeat(86400, init_NTP);
+  }
 }
 
 void init_DHT22()
@@ -82,6 +88,13 @@ void init_DS18B20()
   Serial.println("Init: DS18B20");
 
   sensors.begin();
+}
+
+void init_DS1307()
+{
+  Serial.println("Init: DS1307");
+
+  setSyncProvider(RTC.get);
 }
 
 bool init_W5100()
@@ -154,13 +167,13 @@ void init_NTP()
 {
   Serial.println("Init: NTP");
 
-  udp.begin(LOCALPORT);
-
-  setSyncProvider(getNTP);
+  RTC.set(getNTP());
 }
 
 time_t getNTP()
 {
+  udp.begin(LOCALPORT);
+
   while (udp.parsePacket() > 0);
 
   Serial.println("NTP:  Transmitting NTP request. . .");
@@ -177,7 +190,7 @@ time_t getNTP()
     {
       Serial.println("NTP:  Received NTP response!");
       Serial.println();
-      
+
       udp.read(packetBuffer, NTP_PACKET_SIZE);
 
       unsigned long secsSince1900;
@@ -187,7 +200,7 @@ time_t getNTP()
       secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
       secsSince1900 |= (unsigned long)packetBuffer[43];
 
-      RTC.set(secsSince1900 - 2208988800UL);
+      udp.stop();
 
       return secsSince1900 - 2208988800UL;
     }
@@ -195,7 +208,9 @@ time_t getNTP()
 
   Serial.println("NTP:  No response, using RTC value instead!");
   Serial.println();
-    
+
+  udp.stop();
+
   return RTC.get();
 }
 
@@ -270,10 +285,5 @@ void lampOff()
 
 void loop()
 {
-  if (inited)
-  {
-    read_sensors();
-    
-    Alarm.delay(1);
-  }
+  Alarm.delay(1);
 }
