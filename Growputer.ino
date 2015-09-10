@@ -20,6 +20,7 @@ DHT dht(DHTPIN, DHTTYPE);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 IPAddress timeServer(132, 163, 4, 101);
+EthernetServer server(80);
 
 float airHumids[10];
 float airTemps[10];
@@ -27,8 +28,6 @@ float waterTemps[10];
 
 byte mac[6] = { 0xBE, 0xEF, 0xED, 0xC0, 0xFF, 0xEE };
 byte packetBuffer[NTP_PACKET_SIZE];
-
-float deltaTime = 0;
 
 unsigned char index = 0;
 
@@ -39,55 +38,68 @@ void setup()
 {
   Serial.begin(9600);
 
-  while (!Serial);
-
-  Serial.flush();
-  Serial.println("Growputer v0.1 initializing. . .");
+  Serial.println("Growputer v0.1 initializing");
   Serial.println();
 
-  initHardware();
+  if (initHardware())
+  {
+    Serial.println("Init: Done!");
+    Serial.println();
 
-  Serial.println("Init: Done!");
-  Serial.println();
+    Alarm.timerRepeat(2, read_sensors);
+    Alarm.timerRepeat(60, printStats);
 
-  Alarm.timerRepeat(2, read_sensors);
-  Alarm.timerRepeat(60, printStats);
+    Alarm.alarmRepeat(6, 0, 0, lampOn);
+    Alarm.alarmRepeat(0, 0, 0, lampOff);
 
-  Alarm.alarmRepeat(6, 0, 0, lampOn);
-  Alarm.alarmRepeat(0, 0, 0, lampOff);
+    if (hour() >= 6) lampOn();
+    else lampOff();
 
-  if (hour() >= 6) lampOn();
-  else lampOff();
+    inited = true;
+  }
+  else
+  {
+    Serial.println("Init: Failed!");
 
-  inited = true;
+    while (1);
+  }
 }
 
-void initHardware()
+bool initHardware()
 {
-  init_DHT22();
-  init_DS18B20();
+  if (!init_DHT22()) return false;
+  if (!init_DS18B20()) return false;
+
   init_DS1307();
 
   if (init_W5100())
   {
     init_NTP();
-
-    Alarm.timerRepeat(86400, init_NTP);
+    
+    server.begin();
   }
+
+  return true;
 }
 
-void init_DHT22()
+bool init_DHT22()
 {
   Serial.println("Init: DHT22");
 
   dht.begin();
+
+  if (isnan(dht.readTemperature(false))) return false;
+  else return true;
 }
 
-void init_DS18B20()
+bool init_DS18B20()
 {
   Serial.println("Init: DS18B20");
 
   sensors.begin();
+
+  if (sensors.getDeviceCount() == 0) return false;
+  else return true;
 }
 
 void init_DS1307()
@@ -101,28 +113,30 @@ bool init_W5100()
 {
   Serial.println("Init: W5100");
 
-  if (Ethernet.begin(mac) == 0)
+  pinMode(4, OUTPUT);
+  digitalWrite(4, HIGH);
+
+  if (Ethernet.begin(mac) == 0) return false;
+  else
   {
-    Serial.println("      Failed to configure ethernet using DHCP!");
+    Serial.print("      IP address from DHCP: ");
+    Serial.println(Ethernet.localIP());
 
-    return false;
+    return true;
   }
-
-  Serial.print("      IP address from DHCP: ");
-  Serial.println(Ethernet.localIP());
-
-  return true;
 }
 
 void read_DHT22()
 {
   float humidity = dht.readHumidity();
-  float temperature = dht.readTemperature();
+  float temperature = dht.readTemperature(false);
 
   while (isnan(humidity) || isnan(temperature))
   {
+    Serial.println("NAN");
+
     humidity = dht.readHumidity();
-    temperature = dht.readTemperature();
+    temperature = dht.readTemperature(false);
   }
 
   airHumids[index] = humidity;
@@ -136,31 +150,24 @@ void read_DS18B20()
   waterTemps[index] = sensors.getTempCByIndex(0);
 }
 
-void readTime()
+String readTime()
 {
-  Serial.print("");
-  print2digits(hour());
+  return return2digits(hour());
+  /*Serial.print(return2digits(hour()));
   Serial.print(":");
-  print2digits(minute());
+  Serial.print(return2digits(minute()));
   Serial.print(":");
-  print2digits(second());
+  Serial.print(return2digits(second()));*/
 }
 
-void readDate()
+String readDate()
 {
-  Serial.print("");
-  print2digits(day());
+  return return2digits(day());
+  /*Serial.print(return2digits(day()));
   Serial.print("-");
-  print2digits(month());
+  Serial.print(return2digits(month()));
   Serial.print("-");
-  print2digits(year());
-}
-
-void print2digits(int number)
-{
-  if (number >= 0 && number < 10) Serial.print("0");
-
-  Serial.print(number);
+  Serial.print(year());*/
 }
 
 void init_NTP()
@@ -176,7 +183,7 @@ time_t getNTP()
 
   while (udp.parsePacket() > 0);
 
-  Serial.println("NTP:  Transmitting NTP request. . .");
+  Serial.println("NTP:  Transmitting NTP request");
 
   sendNTPpacket(timeServer);
 
@@ -189,7 +196,6 @@ time_t getNTP()
     if (size >= NTP_PACKET_SIZE)
     {
       Serial.println("NTP:  Received NTP response!");
-      Serial.println();
 
       udp.read(packetBuffer, NTP_PACKET_SIZE);
 
@@ -207,7 +213,6 @@ time_t getNTP()
   }
 
   Serial.println("NTP:  No response, using RTC value instead!");
-  Serial.println();
 
   udp.stop();
 
@@ -239,8 +244,6 @@ void read_sensors()
   read_DHT22();
   read_DS18B20();
 
-  deltaTime += (millis() - currentTime);
-
   index++;
 
   if (index == 10)
@@ -250,9 +253,69 @@ void read_sensors()
     airHumids[0]  = (airHumids[0]  + airHumids[1]  + airHumids[2]  + airHumids[3]  + airHumids[4]  + airHumids[5]  + airHumids[6]  + airHumids[7]  + airHumids[8]  + airHumids[9])  / 10;
     airTemps[0]   = (airTemps[0]   + airTemps[1]   + airTemps[2]   + airTemps[3]   + airTemps[4]   + airTemps[5]   + airTemps[6]   + airTemps[7]   + airTemps[8]   + airTemps[9])   / 10;
     waterTemps[0] = (waterTemps[0] + waterTemps[1] + waterTemps[2] + waterTemps[3] + waterTemps[4] + waterTemps[5] + waterTemps[6] + waterTemps[7] + waterTemps[8] + waterTemps[9]) / 10;
-
-    deltaTime = 0;
   }
+}
+
+/*void listen_server()
+{
+  EthernetClient client = server.available();
+  
+  if (client)
+  {
+    boolean currentLineIsBlank = true;
+    
+    while (client.connected())
+    {
+      if (client.available())
+      {
+        char c = client.read();
+        
+        if (c == '\n' && currentLineIsBlank)
+        {
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println("Connection: close");
+          client.println("Refresh: 5");
+          client.println();
+          client.println("<!DOCTYPE HTML>");
+          client.println("<html>");
+          client.print("Air humidity: ");
+          client.println(airHumids[0]);
+          client.print("<br>Air temperature: ");
+          client.println(airTemps[0]);
+          client.print("<br>Water temperature: ");
+          client.println(waterTemps[0]);
+          client.print("<br><br>Timestamp: ");
+          client.print(return2digits(day()));
+          client.print("-");
+          client.print(return2digits(month()));
+          client.print("-");
+          client.print(return2digits(year()));
+          client.print(" ");
+          client.print(return2digits(hour()));
+          client.print(":");
+          client.print(return2digits(minute()));
+          client.print(":");
+          client.println(return2digits(second()));
+          client.println("</html>");
+
+          break;
+        }
+        
+        if (c == '\n') currentLineIsBlank = true;
+        else if (c != '\r') currentLineIsBlank = false;
+      }
+    }
+    
+    client.stop();
+  }
+}*/
+
+String return2digits(int number)
+{
+  if (number >= 0 && number < 10) return "0" + String(number);
+
+  return String(number);
 }
 
 void printStats()
@@ -264,9 +327,9 @@ void printStats()
   Serial.print("Water temperature: ");
   Serial.println(waterTemps[0]);
   Serial.print("Timestamp: ");
-  readDate();
+  Serial.print(readDate());
   Serial.print(" ");
-  readTime();
+  Serial.print(readTime());
   Serial.println();
   Serial.println();
 }
@@ -285,5 +348,8 @@ void lampOff()
 
 void loop()
 {
-  Alarm.delay(1);
+  Alarm.delay(0);
+
+  //listen_server();
 }
+
