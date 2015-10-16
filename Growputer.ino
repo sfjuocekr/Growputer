@@ -75,7 +75,7 @@ bool initHardware()
   if (init_W5100())
   {
     init_NTP();
-    
+
     server.begin();
   }
 
@@ -256,20 +256,20 @@ void read_sensors()
   }
 }
 
-/*void listen_server()
+void listen_server()
 {
   EthernetClient client = server.available();
-  
+
   if (client)
   {
     boolean currentLineIsBlank = true;
-    
+
     while (client.connected())
     {
       if (client.available())
       {
         char c = client.read();
-        
+
         if (c == '\n' && currentLineIsBlank)
         {
           client.println("HTTP/1.1 200 OK");
@@ -301,15 +301,15 @@ void read_sensors()
 
           break;
         }
-        
+
         if (c == '\n') currentLineIsBlank = true;
         else if (c != '\r') currentLineIsBlank = false;
       }
     }
-    
+
     client.stop();
   }
-}*/
+}
 
 String return2digits(int number)
 {
@@ -350,6 +350,6 @@ void loop()
 {
   Alarm.delay(0);
 
-  //listen_server();
+  listen_server();
 }
 
