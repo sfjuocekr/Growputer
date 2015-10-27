@@ -19,7 +19,7 @@
 DHT dht(DHTPIN, DHTTYPE);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
-IPAddress timeServer(132, 163, 4, 101);
+IPAddress timeServer(5, 200, 6, 34);
 EthernetServer server(80);
 
 float airHumids[10];
@@ -70,7 +70,7 @@ bool initHardware()
   if (!init_DHT22()) return false;
   if (!init_DS18B20()) return false;
 
-  init_DS1307();
+  //init_DS1307();
 
   if (init_W5100())
   {
@@ -79,6 +79,8 @@ bool initHardware()
     server.begin();
   }
 
+  init_DS1307();
+  
   return true;
 }
 
@@ -106,7 +108,8 @@ void init_DS1307()
 {
   Serial.println("Init: DS1307");
 
-  setSyncProvider(RTC.get);
+  //setSyncProvider(RTC.get);
+  setSyncProvider(getNTP);
 }
 
 bool init_W5100()
@@ -173,7 +176,7 @@ String readDate()
 void init_NTP()
 {
   Serial.println("Init: NTP");
-
+  
   RTC.set(getNTP());
 }
 
