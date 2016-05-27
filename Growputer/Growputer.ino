@@ -10,6 +10,7 @@
 #include <SPI.h>
 #include <SD.h>
 #include <ArduinoJson.h>
+#include <Timezone.h>
 
 #define DHT0_PIN      2
 #define DHT1_PIN      3
@@ -45,6 +46,10 @@ EthernetUDP udp;
 DynamicJsonBuffer jsonBuffer;
 JsonObject& jsonData = jsonBuffer.createObject();
 
+TimeChangeRule DST = {"DST", Second, Sun, Mar, 3, 120};
+TimeChangeRule STD = {"STD", Second, Sun, Nov, 3, 180};
+Timezone TZ(DST, STD);
+
 void setup()
 {
   Serial.begin(115200);
@@ -64,10 +69,13 @@ void setup()
     
     Alarm.alarmRepeat(6, 0, 0, setState);      // 2
     Alarm.alarmRepeat(0, 0, 0, setState);      // 3
+    Alarm.timerRepeat(0, 0, 0, syncTime);      // 4
 
     if (loadSettings())
-      Alarm.timerRepeat(60, logStats);         // 4
-    
+      Alarm.timerRepeat(60, logStats);         // 5
+      
+    Alarm.timerRepeat(5, watchdog);            // 6
+
     Serial.println("0");
   }
   else
@@ -80,24 +88,22 @@ void setup()
   }
 }
 
-bool initHardware()
+boolean initHardware()
 {
   pinMode(PUMP_PIN, OUTPUT);
   pinMode(FINT_PIN, OUTPUT);
   pinMode(FEXT_PIN, OUTPUT);
   pinMode(LIGHT_PIN, OUTPUT);
 
-  setState(PUMP_PIN, false);
-  setState(FINT_PIN, false);
+  setState(PUMP_PIN, true);
+  setState(FINT_PIN, true);
   setState(FEXT_PIN, false);
   setState(LIGHT_PIN, false);
-
-  setSyncProvider(RTC.get);
   
   byte _tmp = 0;
   
   _tmp = init_W5100();
-  if (_tmp == 0)
+  if (_tmp <= 1)
   {
     jsonData["IP"] = IPToString(Ethernet.localIP());
     
@@ -105,19 +111,25 @@ bool initHardware()
 
     server.begin();
   }
-  else Serial.println("2" + (String)_tmp);
+  else Serial.print("2" + (String)_tmp);
+  
+  if (RTC.chipPresent())
+    setSyncProvider(RTC.get);
+  else if (_tmp <= 1)
+    setSyncProvider(getNTP);
+  else return false;
 
   _tmp = init_DHT();
   if (_tmp != 0)
   {
-    Serial.println("3" + (String)_tmp);
+    Serial.print("3" + (String)_tmp);
 
     return false;
   }
 
   if (!init_DS18x20())
   {
-    Serial.println("3");
+    Serial.print("4");
 
     return false;
   }
@@ -137,10 +149,12 @@ String IPToString(IPAddress _ip)
 
 byte init_W5100()
 {
-  if (!SD.begin(SD_PIN)) return 1;
+  byte _state = 0;
   
-  if (Ethernet.begin(mac) == 0) return 2;
-  else return 0;
+  if (!SD.begin(SD_PIN)) _state += 1;  
+  if (Ethernet.begin(mac) == 0) _state += 2;
+  
+  return _state;
 }
 
 byte init_DHT()
@@ -157,7 +171,7 @@ byte init_DHT()
   return 0;
 }
 
-bool init_DS18x20()
+boolean init_DS18x20()
 {
   sensors.begin();
 
@@ -165,30 +179,34 @@ bool init_DS18x20()
   else return true;
 }
 
-bool loadSettings()
+boolean loadSettings()
 {
   DynamicJsonBuffer _json;
   JsonObject& _data = _json.parseObject(readSettings());
   
   if (_data.success())
   {
-    jsonData["startTime"] = (unsigned long)_data["startTime"];
-    jsonData["endTime"] = (unsigned long)_data["endTime"];
-    
     setAlarm(true, (unsigned long)_data["startTime"]);
     setAlarm(false, (unsigned long)_data["endTime"]);
-
-    setState(PUMP_PIN, (bool)_data["PUMP"]);    
-    setState(FINT_PIN, (bool)_data["FINT"]);    
-    setState(FEXT_PIN, (bool)_data["FEXT"]);    
     
-    if (seconds() >= jsonData["startTime"]) setState(LIGHT_PIN, true);
-      else setState(LIGHT_PIN, false);
-
-    return true;
+    setState(PUMP_PIN, (boolean)_data["PUMP"]);    
+    setState(FINT_PIN, (boolean)_data["FINT"]);    
+    setState(FEXT_PIN, (boolean)_data["FEXT"]);
   }
-  
-  return false;
+  else
+  {
+    setAlarm(true, (unsigned long)21600);
+    setAlarm(false, (unsigned long)0);
+    
+    setState(PUMP_PIN, (boolean)true);    
+    setState(FINT_PIN, (boolean)true);    
+    setState(FEXT_PIN, (boolean)false);
+  }
+    
+  if (seconds() >= jsonData["startTime"]) setState(LIGHT_PIN, true);
+    else setState(LIGHT_PIN, false);
+
+  return _data.success();
 }
 
 String readSettings()
@@ -215,7 +233,7 @@ String readSettings()
   settingsFile.close();
 }
 
-bool saveSettings()
+boolean saveSettings()
 {
   if (SD.exists("SETTINGS.420"))
     SD.remove("SETTINGS.420");
@@ -249,6 +267,16 @@ void read_DS18x20()
   sensors.requestTemperatures();
   
   jsonData["water_t"] = sensors.getTempCByIndex(0);
+}
+
+void syncTime()
+{
+  RTC.set(getNTP());
+  
+  if (RTC.chipPresent())
+    setSyncProvider(RTC.get);
+  else
+    setSyncProvider(getNTP);
 }
 
 String readTime()
@@ -291,8 +319,10 @@ time_t getNTP()
       secsSince1900 |= (unsigned long)packetBuffer[43];
 
       udp.stop();
+      
+      return TZ.toLocal((unsigned long)(secsSince1900 - 2208988800UL));
 
-      return secsSince1900 - 2208988800UL;
+      //return secsSince1900 - 2208988800UL;
     }
   }
 
@@ -327,7 +357,7 @@ void listenServer()
 
   if (client)
   {
-    bool currentLineIsBlank = true;
+    boolean currentLineIsBlank = true;
 
     while (client.connected())
     {
@@ -387,8 +417,6 @@ void logStats()
   
   (return2digits(day()) + return2digits(month()) + (String)year() + ".420").toCharArray(_fileName, sizeof(_fileName));
     
-  Serial.println(_fileName);
-  
   File logFile = SD.open(_fileName, FILE_WRITE);
   
   if (logFile)
@@ -402,12 +430,11 @@ void logStats()
     _data["dht1_h"] = (float)jsonData["dht1_h"];
     _data["dht1_t"] = (float)jsonData["dht1_t"];
     _data["water_t"] = (float)jsonData["water_t"];
-    _data["PUMP"] = jsonData["PUMP"];
-    _data["FINT"] = jsonData["FINT"];
-    _data["FEXT"] = jsonData["FEXT"];
-    _data["LIGHT"] = jsonData["LIGHT"];
+    _data["PUMP"] = (boolean)jsonData["PUMP"];
+    _data["FINT"] = (boolean)jsonData["FINT"];
+    _data["FEXT"] = (boolean)jsonData["FEXT"];
+    _data["LIGHT"] = (boolean)jsonData["LIGHT"];
     _data.printTo(logFile);
-    _data.printTo(Serial);
     
     logFile.println();
     logFile.close();
@@ -461,7 +488,7 @@ void setState(String _data)
     setState(LIGHT_PIN, (_data.charAt(_data.length() - 1) == '1'));
 }
 
-void setState(int _name, bool _state)
+void setState(int _name, boolean _state)
 {
   switch (_name)
   {
@@ -541,7 +568,7 @@ void setAlarms(unsigned long _start, unsigned long _end)
   saveSettings();
 }
 
-void setAlarm(bool _type, unsigned long _time)
+void setAlarm(boolean _type, unsigned long _time)
 {
   if (_type)
   {
@@ -584,6 +611,18 @@ unsigned long seconds()
                 _time += second();
 
   return _time;
+}
+
+void watchdog()
+{
+  jsonData["RTC"] = RTC.chipPresent();
+  
+  if ((jsonData["dht0_ht"] >= 26) && (!jsonData["FEXT"]))
+    setState(FEXT_PIN, true);
+  else if ((jsonData["dht0_ht"] < 26) && (jsonData["FEXT"]))
+    setState(FEXT_PIN, false);
+    
+//  Serial.println(hour(TZ.toLocal(RTC.get())));
 }
 
 void serialEvent()
