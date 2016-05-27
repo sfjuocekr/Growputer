@@ -11,30 +11,17 @@
 #include <SD.h>
 #include <ArduinoJson.h>
 
-/*
- RTC = SDA 4a
- SCL 5a
- 
- DTH0 = 2d
- DHT1 = 3d
- SD = 4d
- Relay0 = 5d
- Relay1 = 6d
- Relay2 = 7d
- Relay3 = 8d
- W5100 = 10d, keep high is also for DS18x20 power!
- OneWire = 9d
-*/
-
 #define DHT0_PIN      2
 #define DHT1_PIN      3
-#define SD_PIN        4 // DO NOT CHANGE
+#define SD_PIN        4 // FIXED, DO NOT CHANGE
 #define PUMP_PIN      5
 #define FINT_PIN      6
 #define FEXT_PIN      7
 #define LIGHT_PIN     8
 #define ONEWIRE_PIN   9
-#define ETH_PIN      10 // DO NOT CHANGE
+#define ETH_PIN      10 // FIXED, DO NOT CHANGE
+
+// PIN's 11, 12 and 13 are used by the SD card!
 
 #define DHT0_TYPE DHT22
 #define DHT1_TYPE DHT22
@@ -56,11 +43,11 @@ byte packetBuffer[NTP_PACKET_SIZE];
 EthernetUDP udp;
 
 DynamicJsonBuffer jsonBuffer;
-JsonObject& json_data = jsonBuffer.createObject();
+JsonObject& jsonData = jsonBuffer.createObject();
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.flush();
   
   while (!Serial) {}
@@ -106,20 +93,24 @@ bool initHardware()
   setState(LIGHT_PIN, false);
 
   setSyncProvider(RTC.get);
-
-  if (init_W5100())
+  
+  byte _tmp = 0;
+  
+  _tmp = init_W5100();
+  if (_tmp == 0)
   {
-    json_data["IP"] = IPToString(Ethernet.localIP());
+    jsonData["IP"] = IPToString(Ethernet.localIP());
     
     RTC.set(getNTP());
 
     server.begin();
   }
+  else Serial.println("2" + (String)_tmp);
 
-  int _dht = init_DHT();
-  if (_dht != -1)
+  _tmp = init_DHT();
+  if (_tmp != 0)
   {
-    Serial.println("2" + _dht);
+    Serial.println("3" + (String)_tmp);
 
     return false;
   }
@@ -134,18 +125,36 @@ bool initHardware()
   return true;
 }
 
-int init_DHT()
+String IPToString(IPAddress _ip)
+{
+  String _IP = "";
+  
+  for (int i = 0; i < 4; i++)
+    _IP += i ? "." + String(_ip[i]) : String(_ip[i]);
+    
+  return _IP;
+}
+
+byte init_W5100()
+{
+  if (!SD.begin(SD_PIN)) return 1;
+  
+  if (Ethernet.begin(mac) == 0) return 2;
+  else return 0;
+}
+
+byte init_DHT()
 {
   dht0.begin();
   dht1.begin();
 
   if (isnan(dht0.readTemperature(false)))
-    return 0;
+    return 1;
 
   if (isnan(dht0.readTemperature(false)))
-    return 1;
+    return 2;
   
-  return -1;
+  return 0;
 }
 
 bool init_DS18x20()
@@ -156,14 +165,6 @@ bool init_DS18x20()
   else return true;
 }
 
-bool init_W5100()
-{
-  if (!SD.begin(SD_PIN)) return false;
-  
-  if (Ethernet.begin(mac) == 0) return false;
-  else return true;
-}
-
 bool loadSettings()
 {
   DynamicJsonBuffer _json;
@@ -171,8 +172,8 @@ bool loadSettings()
   
   if (_data.success())
   {
-    json_data["startTime"] = (unsigned long)_data["startTime"];
-    json_data["endTime"] = (unsigned long)_data["endTime"];
+    jsonData["startTime"] = (unsigned long)_data["startTime"];
+    jsonData["endTime"] = (unsigned long)_data["endTime"];
     
     setAlarm(true, (unsigned long)_data["startTime"]);
     setAlarm(false, (unsigned long)_data["endTime"]);
@@ -181,7 +182,7 @@ bool loadSettings()
     setState(FINT_PIN, (bool)_data["FINT"]);    
     setState(FEXT_PIN, (bool)_data["FEXT"]);    
     
-    if (seconds() >= json_data["startTime"]) setState(LIGHT_PIN, true);
+    if (seconds() >= jsonData["startTime"]) setState(LIGHT_PIN, true);
       else setState(LIGHT_PIN, false);
 
     return true;
@@ -223,7 +224,7 @@ bool saveSettings()
   
   if (settingsFile)
   {
-    json_data.printTo(settingsFile);
+    jsonData.printTo(settingsFile);
     
     settingsFile.close();
     
@@ -235,29 +236,19 @@ bool saveSettings()
   return false;
 }
 
-String IPToString(IPAddress _ip)
-{
-  String _s = "";
-  
-  for (int _i = 0; _i < 4; _i++)
-    _s += _i ? "." + String(_ip[_i]) : String(_ip[_i]);
-    
-  return _s;
-}
-
 void read_DHT()
 {  
-  json_data["dht0_h"] = dht0.readHumidity();
-  json_data["dht0_t"] = dht0.readTemperature(false);
-  json_data["dht1_h"] = dht1.readHumidity();
-  json_data["dht1_t"] = dht1.readTemperature(false);
+  jsonData["dht0_h"] = dht0.readHumidity();
+  jsonData["dht0_t"] = dht0.readTemperature(false);
+  jsonData["dht1_h"] = dht1.readHumidity();
+  jsonData["dht1_t"] = dht1.readTemperature(false);
 }
 
 void read_DS18x20()
 {
   sensors.requestTemperatures();
   
-  json_data["water_t"] = sensors.getTempCByIndex(0);
+  jsonData["water_t"] = sensors.getTempCByIndex(0);
 }
 
 String readTime()
@@ -276,7 +267,7 @@ time_t getNTP()
 
   while (udp.parsePacket() > 0);
 
-  json_data["NTP"] = -1;
+  jsonData["NTP"] = -1;
 
   sendNTPpacket(timeServer);
 
@@ -288,7 +279,7 @@ time_t getNTP()
 
     if (size >= NTP_PACKET_SIZE)
     {
-      json_data["NTP"] = 1;
+      jsonData["NTP"] = 1;
       
       udp.read(packetBuffer, NTP_PACKET_SIZE);
 
@@ -305,7 +296,7 @@ time_t getNTP()
     }
   }
 
-  json_data["NTP"] = 0;
+  jsonData["NTP"] = 0;
   
   udp.stop();
 
@@ -352,8 +343,8 @@ void listenServer()
           client.println("Connection: close");
           client.println("Refresh: 1");
           client.println();
-          json_data["time"] = RTC.get();
-          json_data.printTo(client);
+          jsonData["time"] = RTC.get();
+          jsonData.printTo(client);
           client.println();
 
           break;
@@ -378,20 +369,24 @@ String return2digits(int number)
 void printStats()
 {
   Serial.print("HUMID0:\t");
-  json_data["dht0_h"].printTo(Serial);
+  jsonData["dht0_h"].printTo(Serial);
   Serial.print("\tTEMP0:\t");
-  json_data["dht0_t"].printTo(Serial);
+  jsonData["dht0_t"].printTo(Serial);
   Serial.print("\nHUMID1:\t");
-  json_data["dht1_h"].printTo(Serial);
+  jsonData["dht1_h"].printTo(Serial);
   Serial.print("\tTEMP1:\t");
-  json_data["dht1_t"].printTo(Serial);
+  jsonData["dht1_t"].printTo(Serial);
   Serial.print("\nWATER:\t");
-  json_data["water_t"].printTo(Serial);
+  jsonData["water_t"].printTo(Serial);
   Serial.println();
 }
 
 void logStats()
 {
+  String _fileName = return2digits(day()) + return2digits(month()) + (String)year() + ".420";
+  
+  Serial.println(_fileName);
+  
   File logFile = SD.open("LOG.420", FILE_WRITE);
   
   if (logFile)
@@ -400,15 +395,15 @@ void logStats()
     JsonObject& _data = _json.createObject();
   
     _data["time"] = (unsigned long)RTC.get();
-    _data["dht0_h"] = (float)json_data["dht0_h"];
-    _data["dht0_t"] = (float)json_data["dht0_t"];
-    _data["dht1_h"] = (float)json_data["dht1_h"];
-    _data["dht1_t"] = (float)json_data["dht1_t"];
-    _data["water_t"] = (float)json_data["water_t"];
-    _data["PUMP"] = json_data["PUMP"];
-    _data["FINT"] = json_data["FINT"];
-    _data["FEXT"] = json_data["FEXT"];
-    _data["LIGHT"] = json_data["LIGHT"];
+    _data["dht0_h"] = (float)jsonData["dht0_h"];
+    _data["dht0_t"] = (float)jsonData["dht0_t"];
+    _data["dht1_h"] = (float)jsonData["dht1_h"];
+    _data["dht1_t"] = (float)jsonData["dht1_t"];
+    _data["water_t"] = (float)jsonData["water_t"];
+    _data["PUMP"] = jsonData["PUMP"];
+    _data["FINT"] = jsonData["FINT"];
+    _data["FEXT"] = jsonData["FEXT"];
+    _data["LIGHT"] = jsonData["LIGHT"];
     _data.printTo(logFile);
     _data.printTo(Serial);
     
@@ -420,13 +415,13 @@ void logStats()
 void printStates()
 {
   Serial.print("PUMP: ");
-  json_data["PUMP"].printTo(Serial);
+  jsonData["PUMP"].printTo(Serial);
   Serial.print("\tFINT: ");
-  json_data["FINT"].printTo(Serial);
+  jsonData["FINT"].printTo(Serial);
   Serial.print("\tFEXT: ");
-  json_data["FEXT"].printTo(Serial);
+  jsonData["FEXT"].printTo(Serial);
   Serial.print("\tLIGHT: ");
-  json_data["LIGHT"].printTo(Serial);
+  jsonData["LIGHT"].printTo(Serial);
   Serial.println();
 }
 
@@ -469,25 +464,25 @@ void setState(int _name, bool _state)
   switch (_name)
   {
     case PUMP_PIN:
-      json_data["PUMP"] = _state;
+      jsonData["PUMP"] = _state;
       digitalWrite(PUMP_PIN, !_state);
       saveSettings();
       break;
     
     case FINT_PIN:
-      json_data["FINT"] = _state;
+      jsonData["FINT"] = _state;
       digitalWrite(FINT_PIN, !_state);
       saveSettings();
       break;
 
     case FEXT_PIN:
-      json_data["FEXT"] = _state;
+      jsonData["FEXT"] = _state;
       digitalWrite(FEXT_PIN, !_state);
       saveSettings();
       break;
 
     case LIGHT_PIN:
-      json_data["LIGHT"] = _state;
+      jsonData["LIGHT"] = _state;
       digitalWrite(LIGHT_PIN, !_state);
       saveSettings();
       break;
@@ -497,9 +492,9 @@ void setState(int _name, bool _state)
 void printAlarms()
 {
   Serial.print("ON: ");
-  json_data["startTime"].printTo(Serial);
+  jsonData["startTime"].printTo(Serial);
   Serial.print("\tOFF: ");
-  json_data["endTime"].printTo(Serial);
+  jsonData["endTime"].printTo(Serial);
   Serial.println();
 }
 
@@ -535,11 +530,11 @@ void setAlarms(String _data)
 
 void setAlarms(unsigned long _start, unsigned long _end)
 {
-  json_data["startTime"] = _start;
-  json_data["endTime"] = _end;
+  jsonData["startTime"] = _start;
+  jsonData["endTime"] = _end;
   
-  Alarm.write(2, json_data["startTime"]);
-  Alarm.write(3, json_data["endTime"]);
+  Alarm.write(2, jsonData["startTime"]);
+  Alarm.write(3, jsonData["endTime"]);
   
   saveSettings();
 }
@@ -548,13 +543,13 @@ void setAlarm(bool _type, unsigned long _time)
 {
   if (_type)
   {
-    json_data["startTime"] = _time;
-    Alarm.write(2, json_data["startTime"]);
+    jsonData["startTime"] = _time;
+    Alarm.write(2, jsonData["startTime"]);
   }
   else
   {
-    json_data["endTime"] = _time;
-    Alarm.write(3, json_data["endTime"]);
+    jsonData["endTime"] = _time;
+    Alarm.write(3, jsonData["endTime"]);
   }
   
   saveSettings();
@@ -576,7 +571,7 @@ void printTime()
   Serial.print("-");
   Serial.print(return2digits(month()));
   Serial.print("-");
-  Serial.println(return2digits(year()));
+  Serial.println(year());
 }
 
 unsigned long seconds()
