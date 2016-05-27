@@ -81,6 +81,7 @@ void setup()
     Alarm.timerRepeat(1, watchdog);            // 6
 
     Serial.println("0");
+    Serial.println("\nEnter 0 for help!\n");
   }
   else
   {
@@ -325,8 +326,6 @@ time_t getNTP()
       udp.stop();
 
       return TZ.toLocal((unsigned long)(secsSince1900 - 2208988800UL));
-
-      //return secsSince1900 - 2208988800UL;
     }
   }
 
@@ -368,7 +367,10 @@ void listenServer()
       if (client.available())
       {
         char c = client.read();
-
+        String s = (String)c;
+        s = s.substring(0, 4);
+        Serial.print(s);
+        
         if (c == '\n' && currentLineIsBlank)
         {
           client.println("HTTP/1.1 200 OK");
