@@ -109,7 +109,7 @@ boolean initHardware()
   _tmp = init_W5100();
   if (_tmp <= 1)
   {
-    jsonData["IP"] = IPToString(Ethernet.localIP());
+    jsonData["IP"] = (String)IPToString(Ethernet.localIP());
 
     RTC.set(getNTP());
 
@@ -260,17 +260,17 @@ boolean saveSettings()
 
 void read_DHT()
 {  
-  jsonData["dht0_h"] = dht0.readHumidity();
-  jsonData["dht0_t"] = dht0.readTemperature(false);
-  jsonData["dht1_h"] = dht1.readHumidity();
-  jsonData["dht1_t"] = dht1.readTemperature(false);
+  jsonData["dht0_h"] = (float)dht0.readHumidity();
+  jsonData["dht0_t"] = (float)dht0.readTemperature(false);
+  jsonData["dht1_h"] = (float)dht1.readHumidity();
+  jsonData["dht1_t"] = (float)dht1.readTemperature(false);
 }
 
 void read_DS18x20()
 {
   sensors.requestTemperatures();
 
-  jsonData["water_t"] = sensors.getTempCByIndex(0);
+  jsonData["water_t"] = (float)sensors.getTempCByIndex(0);
 }
 
 void syncTime()
@@ -299,7 +299,7 @@ time_t getNTP()
 
   while (udp.parsePacket() > 0);
 
-  jsonData["NTP"] = -1;
+  jsonData["NTP"] = (int)-1;
 
   sendNTPpacket(timeServer);
 
@@ -311,7 +311,7 @@ time_t getNTP()
 
     if (size >= NTP_PACKET_SIZE)
     {
-      jsonData["NTP"] = 1;
+      jsonData["NTP"] = (int)1;
 
       udp.read(packetBuffer, NTP_PACKET_SIZE);
 
@@ -330,7 +330,7 @@ time_t getNTP()
     }
   }
 
-  jsonData["NTP"] = 0;
+  jsonData["NTP"] = (int)0;
 
   udp.stop();
 
@@ -377,7 +377,7 @@ void listenServer()
           client.println("Connection: close");
           client.println("Refresh: 1");
           client.println();
-          jsonData["time"] = RTC.get();
+          jsonData["time"] = (unsigned long)RTC.get();
           jsonData.printTo(client);
           client.println();
 
@@ -497,25 +497,25 @@ void setState(int _name, boolean _state)
   switch (_name)
   {
   case PUMP_PIN:
-    jsonData["PUMP"] = _state;
+    jsonData["PUMP"] = (boolean)_state;
     digitalWrite(PUMP_PIN, _state);
     saveSettings();
     break;
 
   case FINT_PIN:
-    jsonData["FINT"] = _state;
+    jsonData["FINT"] = (boolean)_state;
     digitalWrite(FINT_PIN, _state);
     saveSettings();
     break;
 
   case FEXT_PIN:
-    jsonData["FEXT"] = _state;
+    jsonData["FEXT"] = (boolean)_state;
     digitalWrite(FEXT_PIN, !_state);
     saveSettings();
     break;
 
   case LIGHT_PIN:
-    jsonData["LIGHT"] = _state;
+    jsonData["LIGHT"] = (boolean)_state;
     digitalWrite(LIGHT_PIN, !_state);
     saveSettings();
     break;
@@ -563,8 +563,8 @@ void setAlarms(String _data)
 
 void setAlarms(unsigned long _start, unsigned long _end)
 {
-  jsonData["startTime"] = _start;
-  jsonData["endTime"] = _end;
+  jsonData["startTime"] = (unsigned long)_start;
+  jsonData["endTime"] = (unsigned long)_end;
 
   Alarm.write(2, jsonData["startTime"]);
   Alarm.write(3, jsonData["endTime"]);
@@ -576,12 +576,12 @@ void setAlarm(boolean _type, unsigned long _time)
 {
   if (_type)
   {
-    jsonData["startTime"] = _time;
+    jsonData["startTime"] = (unsigned long)_time;
     Alarm.write(2, jsonData["startTime"]);
   }
   else
   {
-    jsonData["endTime"] = _time;
+    jsonData["endTime"] = (unsigned long)_time;
     Alarm.write(3, jsonData["endTime"]);
   }
 
@@ -619,29 +619,23 @@ unsigned long seconds()
 
 void watchdog()
 {
-  jsonData["RTC"] = RTC.chipPresent();
+  jsonData["RTC"] = (int)RTC.chipPresent();
 
   if (((float)jsonData["dht0_t"] > 26) && (!(boolean)jsonData["FEXT"]))
-  {
-    Serial.println("FEXT ON");
-    setState(FEXT_PIN, true);
-  }
+    if ((float)jsonData["dht0_h"] > 60)
+      setState(FEXT_PIN, true);
   else if (((float)jsonData["dht0_t"] < 25) && ((boolean)jsonData["FEXT"]))
-  {
-    Serial.println("FEXT OFF");
     setState(FEXT_PIN, false);
-  }
 
   if (((float)jsonData["water_t"] > 20) && (!(boolean)jsonData["PUMP"]))
-  {
-    Serial.println("PUMP ON");
     setState(PUMP_PIN, true);
-  }
   else if (((float)jsonData["water_t"] < 19) && ((boolean)jsonData["PUMP"]))
-  {
-    Serial.println("PUMP OFF");
     setState(PUMP_PIN, false);
-  }
+
+  if (((float)jsonData["dht0_h"] > 60) && (!(boolean)jsonData["FINT"]))
+    setState(FINT_PIN, true);
+  else if (((float)jsonData["dht0_h"] < 50) && ((boolean)jsonData["FINT"]))
+    setState(FINT_PIN, false);
 }
 
 void serialEvent()
