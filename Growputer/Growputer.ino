@@ -55,7 +55,7 @@ Timezone TZ(DST, STD);
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(9600);
   Serial.flush();
 
   while (!Serial) {
@@ -402,15 +402,15 @@ String return2digits(int number)
 
 void printStats()
 {
-  Serial.print("HUMID0:\t");
+  Serial.print("HUMID0:\t ");
   jsonData["dht0_h"].printTo(Serial);
   Serial.print("\tTEMP0:\t");
   jsonData["dht0_t"].printTo(Serial);
-  Serial.print("\nHUMID1:\t");
+  Serial.print("\nHUMID1:\t ");
   jsonData["dht1_h"].printTo(Serial);
   Serial.print("\tTEMP1:\t");
   jsonData["dht1_t"].printTo(Serial);
-  Serial.print("\nWATER:\t");
+  Serial.print("\nWATER:\t ");
   jsonData["water_t"].printTo(Serial);
   Serial.println();
 }
@@ -447,13 +447,13 @@ void logStats()
 
 void printStates()
 {
-  Serial.print("PUMP: ");
+  Serial.print("PUMP:\t ");
   jsonData["PUMP"].printTo(Serial);
-  Serial.print("\tFINT: ");
+  Serial.print("\tFINT:\t");
   jsonData["FINT"].printTo(Serial);
-  Serial.print("\tFEXT: ");
+  Serial.print("\tFEXT:\t");
   jsonData["FEXT"].printTo(Serial);
-  Serial.print("\tLIGHT: ");
+  Serial.print("\tLIGHT:\t");
   jsonData["LIGHT"].printTo(Serial);
   Serial.println();
 }
@@ -481,10 +481,11 @@ void setState()
 void setState(String _data)
 {
   _data = _data.substring(1, _data.length());
+  _data.toUpperCase();
   
-  if ((_start == -1) && (_end == -1))
+  if (_data.length() == 0)
   {
-    Serial.println("USAGE: XXXX1 for ON XXXX0 OFF");
+    Serial.println("USAGE: XXX1 for ON XXX0 OFF");
     return;
   }
 
@@ -530,11 +531,19 @@ void setState(int _name, boolean _state)
 
 void printAlarms()
 {
-  Serial.print("ON: ");
+  Serial.print("ON:\t ");
   jsonData["startTime"].printTo(Serial);
-  Serial.print("\tOFF: ");
+  Serial.print("\t\tOFF:\t");
   jsonData["endTime"].printTo(Serial);
   Serial.println();
+  
+  Serial.print("\t " + return2digits(hour(jsonData["startTime"])));
+  Serial.print(":" + return2digits(minute(jsonData["startTime"])));
+  Serial.print(":" +return2digits(second(jsonData["startTime"])));
+
+  Serial.print("\t\t" + return2digits(hour(jsonData["endTime"])));
+  Serial.print(":" + return2digits(minute(jsonData["endTime"])));
+  Serial.println(":" +return2digits(second(jsonData["endTime"])));
 }
 
 void setAlarms(String _data)
@@ -544,7 +553,7 @@ void setAlarms(String _data)
 
   if ((_start == -1) && (_end == -1))
   {
-    Serial.println("USAGE: XXXs for LIGHT ON, YYYe for LIGHT OFF");
+    Serial.println("USAGE: XXXs for LIGHT ON, XXXe for LIGHT OFF");
     return;
   }
 
@@ -604,14 +613,14 @@ void printTime()
 {   
   Serial.println("SECONDS: " + (String)seconds());
 
-  Serial.print("TIME: ");
+  Serial.print("TIME:\t ");
   Serial.print(return2digits(hour()));
   Serial.print(":");
   Serial.print(return2digits(minute()));
   Serial.print(":");
   Serial.print(return2digits(second()));
 
-  Serial.print("\tDATE: ");
+  Serial.print("\tDATE:\t");
   Serial.print(return2digits(day()));
   Serial.print("-");
   Serial.print(return2digits(month()));
@@ -700,30 +709,39 @@ void serialEvent()
       printAlarms();
       printTime();
       break;
+      
     case 50: // 2
       printStats(); 
       break;
+      
     case 51: // 3
       printStates(); 
       break;
+      
     case 52: // 4 
       printAlarms(); 
       break;
+      
     case 53: // 5 
       printTime(); 
       break;
+      
     case 54: // 6 
       setState(_serialString); 
       break;
+      
     case 55: // 7 
       setAlarms(_serialString); 
       break;
+      
     case 56: // 8
       saveSettings(); 
       break;
+      
     case 57: // 9
       showPorn();
       break;
+      
     case 48: // 0
       Serial.println("\n\t        ________________");
       Serial.println("  \t       /^^^^^^^^^^^^^^^^\\");
@@ -747,6 +765,7 @@ void serialEvent()
       Serial.println(  "\t |0: this help        |    |  |");
       Serial.println(  "\t |____________________|____|__|\n");
       break;
+      
     default: 
       Serial.println("NOT IMPLEMENTED"); 
       break;
