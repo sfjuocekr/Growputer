@@ -383,11 +383,13 @@ void printStats()
 
 void logStats()
 {
-  String _fileName = return2digits(day()) + return2digits(month()) + (String)year() + ".420";
+  char _fileName[13];
   
+  (return2digits(day()) + return2digits(month()) + (String)year() + ".420").toCharArray(_fileName, sizeof(_fileName));
+    
   Serial.println(_fileName);
   
-  File logFile = SD.open("LOG.420", FILE_WRITE);
+  File logFile = SD.open(_fileName, FILE_WRITE);
   
   if (logFile)
   {
