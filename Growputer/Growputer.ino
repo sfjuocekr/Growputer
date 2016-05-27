@@ -481,6 +481,12 @@ void setState()
 void setState(String _data)
 {
   _data = _data.substring(1, _data.length());
+  
+  if ((_start == -1) && (_end == -1))
+  {
+    Serial.println("USAGE: XXXX1 for ON XXXX0 OFF");
+    return;
+  }
 
   if (_data.substring(0, _data.length() - 1) == "PUMP")
     setState(PUMP_PIN, (_data.charAt(_data.length() - 1) == '1'));
@@ -535,6 +541,12 @@ void setAlarms(String _data)
 {
   int _start = _data.indexOf("s");
   int _end = _data.indexOf("e");
+
+  if ((_start == -1) && (_end == -1))
+  {
+    Serial.println("USAGE: XXXs for LIGHT ON, YYYe for LIGHT OFF");
+    return;
+  }
 
   if ((_start > -1) && (_end == -1))
   {
@@ -624,18 +636,53 @@ void watchdog()
   if (((float)jsonData["dht0_t"] > 26) && (!(boolean)jsonData["FEXT"]))
     if ((float)jsonData["dht0_h"] > 60)
       setState(FEXT_PIN, true);
-  else if (((float)jsonData["dht0_t"] < 25) && ((boolean)jsonData["FEXT"]))
-    setState(FEXT_PIN, false);
+    else if (((float)jsonData["dht0_t"] < 26) && ((boolean)jsonData["FEXT"]))
+      if ((float)jsonData["dht0_h"] < 60)
+        setState(FEXT_PIN, false);
 
   if (((float)jsonData["water_t"] > 20) && (!(boolean)jsonData["PUMP"]))
     setState(PUMP_PIN, true);
-  else if (((float)jsonData["water_t"] < 19) && ((boolean)jsonData["PUMP"]))
+  else if (((float)jsonData["water_t"] < 20) && ((boolean)jsonData["PUMP"]))
     setState(PUMP_PIN, false);
 
   if (((float)jsonData["dht0_h"] > 60) && (!(boolean)jsonData["FINT"]))
     setState(FINT_PIN, true);
   else if (((float)jsonData["dht0_h"] < 50) && ((boolean)jsonData["FINT"]))
     setState(FINT_PIN, false);
+}
+
+void showPorn()
+{
+  if (!SD.exists("README.420"))
+  {
+    Serial.println("NO PORN AVAILABLE!");
+    
+    return;
+  }
+  
+  File pornFile = SD.open("README.420", FILE_READ);
+
+  if (pornFile)
+  {
+    String _pornLines;
+    
+    Serial.println();
+
+    while (pornFile.available())
+    {
+      char _readChar = (char)pornFile.read();
+      
+      if (_readChar == '\n')
+      {
+        Serial.println((String)_pornLines);
+        
+        _pornLines = "";
+      }
+      else _pornLines += (String)_readChar;
+    }
+  }
+
+  pornFile.close();
 }
 
 void serialEvent()
@@ -647,38 +694,59 @@ void serialEvent()
 
     switch (_serialString.charAt(0))
     {
-    case 48: 
-      printStats();                             // 0
+    case 49: // 1
+      printStats();
       printStates();
       printAlarms();
       printTime();
       break;
-    case 49: 
+    case 50: // 2
       printStats(); 
-      break;                            // 1
-    case 50: 
+      break;
+    case 51: // 3
       printStates(); 
-      break;                           // 2
-    case 51: 
+      break;
+    case 52: // 4 
       printAlarms(); 
-      break;                           // 3
-    case 52: 
+      break;
+    case 53: // 5 
       printTime(); 
-      break;                             // 4
-    case 53: 
+      break;
+    case 54: // 6 
       setState(_serialString); 
-      break;                 // 5
-    case 54: 
+      break;
+    case 55: // 7 
       setAlarms(_serialString); 
-      break;                // 6
-    case 55: 
-      break;                                          // 7
-    case 56: 
-      loadSettings(); 
-      break;                          // 8
-    case 57: 
+      break;
+    case 56: // 8
       saveSettings(); 
-      break;                          // 9
+      break;
+    case 57: // 9
+      showPorn();
+      break;
+    case 48: // 0
+      Serial.println("\n\t        ________________");
+      Serial.println("  \t       /^^^^^^^^^^^^^^^^\\");
+      Serial.println("  \t      /------------------\\");
+      Serial.println("  \t     /--------------------\\");
+      Serial.println("  \t    /----------------------\\");
+      Serial.println("  \t   /------------------------\\");
+      Serial.println("  \t  /--------------------------\\");
+      Serial.println("  \t /____________________________\\");
+      Serial.println("  \t |-----[ Growputer 2016 ]-----|");
+      Serial.println(  "\t |^^^^^^^^^^^^^^^^^^^^^^^^^^^^|");
+      Serial.println(  "\t |1: all stats                |");
+      Serial.println(  "\t |2: humidity and temperature |");
+      Serial.println(  "\t |3: relay states             |");
+      Serial.println(  "\t |4: day/night timers         |");
+      Serial.println(  "\t |5: time/date                |");
+      Serial.println(  "\t |6: set relay state          |");
+      Serial.println(  "\t |7: set timer(s)     ______  |");
+      Serial.println(  "\t |8: save settings    |    |  |");
+      Serial.println(  "\t |9: watch porn       |   _|  |");
+      Serial.println(  "\t |0: this help        |    |  |");
+      Serial.println(  "\t |____________________|____|__|\n");
+      break;
     default: 
       Serial.println("NOT IMPLEMENTED"); 
       break;
@@ -692,5 +760,4 @@ void loop()
 
   listenServer();
 }
-
 
