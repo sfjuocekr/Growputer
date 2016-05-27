@@ -39,24 +39,28 @@ DallasTemperature sensors(&oneWire);
 
 IPAddress timeServer(5, 200, 6, 34);
 EthernetServer server(HTTP_PORT);
-byte mac[6] = { 0xBE, 0xEF, 0xED, 0xC0, 0xFF, 0xEE };
+byte mac[6] = { 
+  0xBE, 0xEF, 0xED, 0xC0, 0xFF, 0xEE };
 byte packetBuffer[NTP_PACKET_SIZE];
 EthernetUDP udp;
 
 DynamicJsonBuffer jsonBuffer;
 JsonObject& jsonData = jsonBuffer.createObject();
 
-TimeChangeRule DST = {"DST", Second, Sun, Mar, 3, 120};
-TimeChangeRule STD = {"STD", Second, Sun, Nov, 3, 180};
+TimeChangeRule DST = {
+  "DST", Second, Sun, Mar, 3, 120};
+TimeChangeRule STD = {
+  "STD", Second, Sun, Nov, 3, 180};
 Timezone TZ(DST, STD);
 
 void setup()
 {
   Serial.begin(115200);
   Serial.flush();
-  
-  while (!Serial) {}
-  
+
+  while (!Serial) {
+  }
+
   Serial.print("Growputer 2016: ");
 
   if (initHardware())
@@ -66,15 +70,15 @@ void setup()
 
     Alarm.timerRepeat(1, read_DS18x20);        // 0
     Alarm.timerRepeat(2, read_DHT);            // 1
-    
+
     Alarm.alarmRepeat(6, 0, 0, setState);      // 2
     Alarm.alarmRepeat(0, 0, 0, setState);      // 3
     Alarm.timerRepeat(0, 0, 0, syncTime);      // 4
 
     if (loadSettings())
       Alarm.timerRepeat(60, logStats);         // 5
-      
-    Alarm.timerRepeat(5, watchdog);            // 6
+
+    Alarm.timerRepeat(1, watchdog);            // 6
 
     Serial.println("0");
   }
@@ -99,20 +103,20 @@ boolean initHardware()
   setState(FINT_PIN, true);
   setState(FEXT_PIN, false);
   setState(LIGHT_PIN, false);
-  
+
   byte _tmp = 0;
-  
+
   _tmp = init_W5100();
   if (_tmp <= 1)
   {
     jsonData["IP"] = IPToString(Ethernet.localIP());
-    
+
     RTC.set(getNTP());
 
     server.begin();
   }
   else Serial.print("2" + (String)_tmp);
-  
+
   if (RTC.chipPresent())
     setSyncProvider(RTC.get);
   else if (_tmp <= 1)
@@ -140,20 +144,20 @@ boolean initHardware()
 String IPToString(IPAddress _ip)
 {
   String _IP = "";
-  
+
   for (int i = 0; i < 4; i++)
     _IP += i ? "." + String(_ip[i]) : String(_ip[i]);
-    
+
   return _IP;
 }
 
 byte init_W5100()
 {
   byte _state = 0;
-  
+
   if (!SD.begin(SD_PIN)) _state += 1;  
   if (Ethernet.begin(mac) == 0) _state += 2;
-  
+
   return _state;
 }
 
@@ -167,7 +171,7 @@ byte init_DHT()
 
   if (isnan(dht0.readTemperature(false)))
     return 2;
-  
+
   return 0;
 }
 
@@ -183,12 +187,12 @@ boolean loadSettings()
 {
   DynamicJsonBuffer _json;
   JsonObject& _data = _json.parseObject(readSettings());
-  
+
   if (_data.success())
   {
     setAlarm(true, (unsigned long)_data["startTime"]);
     setAlarm(false, (unsigned long)_data["endTime"]);
-    
+
     setState(PUMP_PIN, (boolean)_data["PUMP"]);    
     setState(FINT_PIN, (boolean)_data["FINT"]);    
     setState(FEXT_PIN, (boolean)_data["FEXT"]);
@@ -197,14 +201,14 @@ boolean loadSettings()
   {
     setAlarm(true, (unsigned long)21600);
     setAlarm(false, (unsigned long)0);
-    
+
     setState(PUMP_PIN, (boolean)true);    
     setState(FINT_PIN, (boolean)true);    
     setState(FEXT_PIN, (boolean)false);
   }
-    
+
   if (seconds() >= jsonData["startTime"]) setState(LIGHT_PIN, true);
-    else setState(LIGHT_PIN, false);
+  else setState(LIGHT_PIN, false);
 
   return _data.success();
 }
@@ -213,23 +217,23 @@ String readSettings()
 {
   if (!SD.exists("SETTINGS.420"))
     saveSettings();
-  
+
   File settingsFile = SD.open("SETTINGS.420", FILE_READ);
-  
+
   if (settingsFile)
   {
     String _json;
-    
+
     while (settingsFile.available())
     {
       _json += (String)(char)settingsFile.read();
     }
-    
+
     settingsFile.close();
-    
+
     return _json;
   }
-  
+
   settingsFile.close();
 }
 
@@ -237,20 +241,20 @@ boolean saveSettings()
 {
   if (SD.exists("SETTINGS.420"))
     SD.remove("SETTINGS.420");
-    
+
   File settingsFile = SD.open("SETTINGS.420", FILE_WRITE);
-  
+
   if (settingsFile)
   {
     jsonData.printTo(settingsFile);
-    
+
     settingsFile.close();
-    
+
     return true;
   }
 
   settingsFile.close();
-  
+
   return false;
 }
 
@@ -265,14 +269,14 @@ void read_DHT()
 void read_DS18x20()
 {
   sensors.requestTemperatures();
-  
+
   jsonData["water_t"] = sensors.getTempCByIndex(0);
 }
 
 void syncTime()
 {
   RTC.set(getNTP());
-  
+
   if (RTC.chipPresent())
     setSyncProvider(RTC.get);
   else
@@ -308,7 +312,7 @@ time_t getNTP()
     if (size >= NTP_PACKET_SIZE)
     {
       jsonData["NTP"] = 1;
-      
+
       udp.read(packetBuffer, NTP_PACKET_SIZE);
 
       unsigned long secsSince1900;
@@ -319,7 +323,7 @@ time_t getNTP()
       secsSince1900 |= (unsigned long)packetBuffer[43];
 
       udp.stop();
-      
+
       return TZ.toLocal((unsigned long)(secsSince1900 - 2208988800UL));
 
       //return secsSince1900 - 2208988800UL;
@@ -327,7 +331,7 @@ time_t getNTP()
   }
 
   jsonData["NTP"] = 0;
-  
+
   udp.stop();
 
   return RTC.get();
@@ -414,16 +418,16 @@ void printStats()
 void logStats()
 {
   char _fileName[13];
-  
+
   (return2digits(day()) + return2digits(month()) + (String)year() + ".420").toCharArray(_fileName, sizeof(_fileName));
-    
+
   File logFile = SD.open(_fileName, FILE_WRITE);
-  
+
   if (logFile)
   {
     DynamicJsonBuffer _json;
     JsonObject& _data = _json.createObject();
-  
+
     _data["time"] = (unsigned long)RTC.get();
     _data["dht0_h"] = (float)jsonData["dht0_h"];
     _data["dht0_t"] = (float)jsonData["dht0_t"];
@@ -435,7 +439,7 @@ void logStats()
     _data["FEXT"] = (boolean)jsonData["FEXT"];
     _data["LIGHT"] = (boolean)jsonData["LIGHT"];
     _data.printTo(logFile);
-    
+
     logFile.println();
     logFile.close();
   }
@@ -457,27 +461,27 @@ void printStates()
 void setState()
 {
   int alarmID = Alarm.getTriggeredAlarmId();
-  
+
   switch (alarmID)
   {
-    case 2:
-      setState(LIGHT_PIN, true);
-      break;
+  case 2:
+    setState(LIGHT_PIN, true);
+    break;
 
-    case 3:
-      setState(LIGHT_PIN, false);
-      break;
+  case 3:
+    setState(LIGHT_PIN, false);
+    break;
 
-    default:
-      Serial.println("TIMER: " + Alarm.getTriggeredAlarmId());
-      break;
+  default:
+    Serial.println("TIMER: " + Alarm.getTriggeredAlarmId());
+    break;
   }
 }
 
 void setState(String _data)
 {
   _data = _data.substring(1, _data.length());
-  
+
   if (_data.substring(0, _data.length() - 1) == "PUMP")
     setState(PUMP_PIN, (_data.charAt(_data.length() - 1) == '1'));
   if (_data.substring(0, _data.length() - 1) == "FINT")
@@ -492,29 +496,29 @@ void setState(int _name, boolean _state)
 {
   switch (_name)
   {
-    case PUMP_PIN:
-      jsonData["PUMP"] = _state;
-      digitalWrite(PUMP_PIN, !_state);
-      saveSettings();
-      break;
-    
-    case FINT_PIN:
-      jsonData["FINT"] = _state;
-      digitalWrite(FINT_PIN, !_state);
-      saveSettings();
-      break;
+  case PUMP_PIN:
+    jsonData["PUMP"] = _state;
+    digitalWrite(PUMP_PIN, _state);
+    saveSettings();
+    break;
 
-    case FEXT_PIN:
-      jsonData["FEXT"] = _state;
-      digitalWrite(FEXT_PIN, !_state);
-      saveSettings();
-      break;
+  case FINT_PIN:
+    jsonData["FINT"] = _state;
+    digitalWrite(FINT_PIN, _state);
+    saveSettings();
+    break;
 
-    case LIGHT_PIN:
-      jsonData["LIGHT"] = _state;
-      digitalWrite(LIGHT_PIN, !_state);
-      saveSettings();
-      break;
+  case FEXT_PIN:
+    jsonData["FEXT"] = _state;
+    digitalWrite(FEXT_PIN, !_state);
+    saveSettings();
+    break;
+
+  case LIGHT_PIN:
+    jsonData["LIGHT"] = _state;
+    digitalWrite(LIGHT_PIN, !_state);
+    saveSettings();
+    break;
   }
 }
 
@@ -531,25 +535,25 @@ void setAlarms(String _data)
 {
   int _start = _data.indexOf("s");
   int _end = _data.indexOf("e");
-    
+
   if ((_start > -1) && (_end == -1))
   {
     setAlarm(true, (unsigned long)_data.substring(1, _start).toInt());
     return;
   }
-  
+
   if ((_end > -1) && (_start == -1))
   {
     setAlarm(false, (unsigned long)_data.substring(1, _end).toInt());
     return;
   }
-  
+
   if ((_start > -1) && (_end > -1) && (_end < _start))
   {
     setAlarms((unsigned long)_data.substring(_end + 1, _start).toInt(), (unsigned long)_data.substring(1, _end).toInt());
     return;
   }
-  
+
   if ((_start > -1) && (_end > -1) && (_end > _start))
   {
     setAlarms((unsigned long)_data.substring(1, _start).toInt(), (unsigned long)_data.substring(_start + 1, _end).toInt());
@@ -561,10 +565,10 @@ void setAlarms(unsigned long _start, unsigned long _end)
 {
   jsonData["startTime"] = _start;
   jsonData["endTime"] = _end;
-  
+
   Alarm.write(2, jsonData["startTime"]);
   Alarm.write(3, jsonData["endTime"]);
-  
+
   saveSettings();
 }
 
@@ -580,14 +584,14 @@ void setAlarm(boolean _type, unsigned long _time)
     jsonData["endTime"] = _time;
     Alarm.write(3, jsonData["endTime"]);
   }
-  
+
   saveSettings();
 }
 
 void printTime()
 {   
   Serial.println("SECONDS: " + (String)seconds());
-  
+
   Serial.print("TIME: ");
   Serial.print(return2digits(hour()));
   Serial.print(":");
@@ -606,9 +610,9 @@ void printTime()
 unsigned long seconds()
 {
   unsigned long _time = hour();
-                _time *= 3600;
-                _time += minute() * 60;
-                _time += second();
+  _time *= 3600;
+  _time += minute() * 60;
+  _time += second();
 
   return _time;
 }
@@ -616,13 +620,28 @@ unsigned long seconds()
 void watchdog()
 {
   jsonData["RTC"] = RTC.chipPresent();
-  
-  if ((jsonData["dht0_ht"] >= 26) && (!jsonData["FEXT"]))
+
+  if (((float)jsonData["dht0_t"] > 26) && (!(boolean)jsonData["FEXT"]))
+  {
+    Serial.println("FEXT ON");
     setState(FEXT_PIN, true);
-  else if ((jsonData["dht0_ht"] < 26) && (jsonData["FEXT"]))
+  }
+  else if (((float)jsonData["dht0_t"] < 25) && ((boolean)jsonData["FEXT"]))
+  {
+    Serial.println("FEXT OFF");
     setState(FEXT_PIN, false);
-    
-//  Serial.println(hour(TZ.toLocal(RTC.get())));
+  }
+
+  if (((float)jsonData["water_t"] > 20) && (!(boolean)jsonData["PUMP"]))
+  {
+    Serial.println("PUMP ON");
+    setState(PUMP_PIN, true);
+  }
+  else if (((float)jsonData["water_t"] < 19) && ((boolean)jsonData["PUMP"]))
+  {
+    Serial.println("PUMP OFF");
+    setState(PUMP_PIN, false);
+  }
 }
 
 void serialEvent()
@@ -630,25 +649,45 @@ void serialEvent()
   if (Serial.available())
   {
     String _serialString = Serial.readString();
-           _serialString.trim();
-    
+    _serialString.trim();
+
     switch (_serialString.charAt(0))
     {
-      case 48: printStats();                             // 0
-               printStates();
-               printAlarms();
-               printTime();
-               break;
-      case 49: printStats(); break;                            // 1
-      case 50: printStates(); break;                           // 2
-      case 51: printAlarms(); break;                           // 3
-      case 52: printTime(); break;                             // 4
-      case 53: setState(_serialString); break;                 // 5
-      case 54: setAlarms(_serialString); break;                // 6
-      case 55: break;                                          // 7
-      case 56: loadSettings(); break;                          // 8
-      case 57: saveSettings(); break;                          // 9
-      default: Serial.println("NOT IMPLEMENTED"); break;
+    case 48: 
+      printStats();                             // 0
+      printStates();
+      printAlarms();
+      printTime();
+      break;
+    case 49: 
+      printStats(); 
+      break;                            // 1
+    case 50: 
+      printStates(); 
+      break;                           // 2
+    case 51: 
+      printAlarms(); 
+      break;                           // 3
+    case 52: 
+      printTime(); 
+      break;                             // 4
+    case 53: 
+      setState(_serialString); 
+      break;                 // 5
+    case 54: 
+      setAlarms(_serialString); 
+      break;                // 6
+    case 55: 
+      break;                                          // 7
+    case 56: 
+      loadSettings(); 
+      break;                          // 8
+    case 57: 
+      saveSettings(); 
+      break;                          // 9
+    default: 
+      Serial.println("NOT IMPLEMENTED"); 
+      break;
     }
   }
 }
@@ -659,4 +698,5 @@ void loop()
 
   listenServer();
 }
+
 
