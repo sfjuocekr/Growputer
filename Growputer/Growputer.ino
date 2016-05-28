@@ -1,3 +1,4 @@
+#include <Growputer.h>
 #include <DHT.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -52,6 +53,9 @@ TimeChangeRule DST = {
 TimeChangeRule STD = {
   "STD", Second, Sun, Nov, 3, 180};
 Timezone TZ(DST, STD);
+
+String settingsFileName = "SETTINGS.420";
+String pornFileName = "README.420";
 
 void setup()
 {
@@ -216,10 +220,14 @@ boolean loadSettings()
 
 String readSettings()
 {
-  if (!SD.exists("SETTINGS.420"))
+  char _fileName[13];
+
+  settingsFileName.toCharArray(_fileName, sizeof(_fileName));
+
+  if (!SD.exists(_fileName))
     saveSettings();
 
-  File settingsFile = SD.open("SETTINGS.420", FILE_READ);
+  File settingsFile = SD.open(_fileName, FILE_READ);
 
   if (settingsFile)
   {
@@ -236,14 +244,20 @@ String readSettings()
   }
 
   settingsFile.close();
+
+  return "";
 }
 
 boolean saveSettings()
 {
-  if (SD.exists("SETTINGS.420"))
-    SD.remove("SETTINGS.420");
+  char _fileName[13];
 
-  File settingsFile = SD.open("SETTINGS.420", FILE_WRITE);
+  settingsFileName.toCharArray(_fileName, sizeof(_fileName));
+
+  if (SD.exists(_fileName))
+    SD.remove(_fileName);
+
+  File settingsFile = SD.open(_fileName, FILE_WRITE);
 
   if (settingsFile)
   {
@@ -645,11 +659,13 @@ void watchdog()
   jsonData["RTC"] = (int)RTC.chipPresent();
 
   if (((float)jsonData["dht0_t"] > 26) && (!(boolean)jsonData["FEXT"]))
+  {
     if ((float)jsonData["dht0_h"] > 60)
       setState(FEXT_PIN, true);
     else if (((float)jsonData["dht0_t"] < 26) && ((boolean)jsonData["FEXT"]))
       if ((float)jsonData["dht0_h"] < 60)
         setState(FEXT_PIN, false);
+  }
 
   if (((float)jsonData["water_t"] > 20) && (!(boolean)jsonData["PUMP"]))
     setState(PUMP_PIN, true);
@@ -664,14 +680,18 @@ void watchdog()
 
 void showPorn()
 {
-  if (!SD.exists("README.420"))
+  char _fileName[13];
+
+  pornFileName.toCharArray(_fileName, sizeof(_fileName));
+
+  if (!SD.exists(_fileName))
   {
     Serial.println("NO PORN AVAILABLE!");
     
     return;
   }
   
-  File pornFile = SD.open("README.420", FILE_READ);
+  File pornFile = SD.open(_fileName, FILE_READ);
 
   if (pornFile)
   {
