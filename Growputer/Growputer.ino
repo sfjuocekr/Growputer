@@ -422,11 +422,13 @@ void printStats()
   jsonData["dht0_h"].printTo(Serial);
   Serial.print("\tTEMP0:\t");
   jsonData["dht0_t"].printTo(Serial);
-  Serial.print("\nHUMID1:\t ");
+  Serial.println();
+  Serial.print("HUMID1:\t ");
   jsonData["dht1_h"].printTo(Serial);
   Serial.print("\tTEMP1:\t");
   jsonData["dht1_t"].printTo(Serial);
-  Serial.print("\nWATER:\t ");
+  Serial.println();
+  Serial.print("WATER:\t ");
   jsonData["water_t"].printTo(Serial);
   Serial.println();
 }
