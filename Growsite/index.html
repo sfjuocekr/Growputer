@@ -1,16 +1,372 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-		<title>Arduino Reader</title>
-        <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
-        <link rel="stylesheet" type="text/css" href="css/sjoer.css">
-        <script src="js/arduinoReader.js"></script>
-   </head>
+<head>
+<title>Growputer Dashboard</title>
+<link rel="stylesheet" type="text/css" href="css/growputer.css" media="screen" />
+<link href='https://fonts.googleapis.com/css?family=Lobster' rel='stylesheet' type='text/css'>
+<link href="css/switches.css" rel="stylesheet">
+<script src="js/ui/raphael-2.1.4.min.js"></script>
+<script src="js/ui/justgage.js"></script>
+<script src="js/arduinoReader.js"></script>
+</head>
+<!-- end head-->
+<input class="address" type="text" value="http://10.0.1.3" onChange="ArduinoReader.SetAddress(this)" style="visibilty:hidden;" />
+<!--body-->
+<body onload="ArduinoReader.Start()">
+<!--container (wrapper)-->
+<div id="container">
+	<!--start header-->
+	<div id="header">
+		<ul class="mainnavigation">
+			<li class="navlink"><a href="#">Dashboard</a></li>
+			<li class="navlink"><a href="#">Stats</a></li>
+			<li class="navlink"><a href="#">Settings</a></li>
+			<li class="navlink"><a href="#">Ghalp!?</a></li>
+		</ul>
+	</div>
+	<!--end header-->
+	<!--start content-->
+	<div id="content">
+		<table>
+		<!--Table row 1-->
+			<tr>
+		    	<th class="gauge">Greenhouse</th>
+		   	 	<th class="gauge">Room</th>
+		 		<th class="gauge">Aquarium</th>
+			    <th class="switch">Light</th>
+			    <th class="switch">Pump</th>
+			    <th class="switch">Internal Fan</th>
+			    <th class="switch">External Fan</th>
+			</tr>
+		<!--Table row 2-->
+			<tr>
+				<!--svg gauge greenhouse temperature-->
+				<td class="gauge">
+					<div id="GreenHouseTempGauge"></div>
+				</td>
+				<!--svg gauge room temperature-->
+		 		<td class="gauge">
+					<div id="RoomTempGauge"></div>
+				</td>
+		   		<!--svg gauge water temperature-->
+			    <td class="gauge">
+				    <div id="WaterTempGauge"></div>
+				</td>    
+				<!--css switch greenhouse light-->
+				<td class="switch_cell" rowspan="2">
+				   	<center>
+				    <div class="horizontal-switch">
+						<div class="switch">
+					    	<input id="cmn-toggle-light" class="cmn-toggle cmn-toggle-round-flat" type="checkbox">
+						    <label for="cmn-toggle-light"></label>
+					    </div>
+					</div>
+			    </center>
+				</td>
+				<!--css switch pump-->
+				<td class="switch" rowspan="2">
+				    <center>
+					<div class="horizontal-switch">
+						<div class="switch">
+					   		<input id="cmn-toggle-pump" class="cmn-toggle cmn-toggle-round-flat" type="checkbox">
+						    <label for="cmn-toggle-pump"></label>
+					    </div>
+			    	</div>
+				</center>	
+				</td>
+   		 		<!--css switch external fan-->
+				<td class="switch" rowspan="2">
+					<center>
+						<div class="horizontal-switch">
+							<div class="switch">
+				    			<input id="cmn-toggle-exfan" class="cmn-toggle cmn-toggle-round-flat" type="checkbox">
+						   		<label for="cmn-toggle-exfan"></label>
+							</div>
+						</div>
+				    </center>
+				</td>
+    			<!--css switch internal fan-->
+				<td class="switch" rowspan="2">
+					<center>	
+					<div class="horizontal-switch">
+						<div class="switch">
+						    <input id="cmn-toggle-intfan" class="cmn-toggle cmn-toggle-round-flat" type="checkbox">
+						    <label for="cmn-toggle-intfan"></label>
+						</div>
+					</div>
+			    </center>
+ 				</td>
+			</tr>
+			<!--table row 2-->
+			<tr>
+		 		<!--svg gauge greenhouse relative humidity-->
+			    <td class="gauge">
+					<div id="GreenHouseRHGauge"></div>
+				</td>
+		 	   	<!--svg gauge room relative humidity-->
+			    <td class="gauge">
+				   	<div id="RoomRHGauge" class="160x160px"></div>
+				</td>
+	   	 	   	<!--svg gauge aquarium pH-->
+			    <td class="gauge">
+					<div id="ph1_gauge">
+					</div>
+ 	  			</td>
+			</tr>
+		</table>
+		<!-- this is where Ernst's script comes in -->
+			<!--<div id="graphs">-->
+
+				<table>
+    	   			<tr class="historyhead">
+    	   				<th class="history">
+							Last Week
+						</th>
+	  	   				<th class="history">
+    	   				 	Last 24 Hours						</th>
+		   				<th class="history">
+    	   				 	Last 60 minutes
+						</th>
+    	   			</tr>
+    	   			<tr class="history">
+    	   				<td>
+    	   				 	<p id="max-label-x" class="axis-label">100</p>
+    	   				 	<p id="min-label-x" class="axis-label">0</p>
+    	   				 	<canvas id="data_plotter" width="228px">
+							</canvas>
+						</td>
+	  	   				<td>
+	  	   					<p id="max-label-x" class="axis-label">100</p>
+    	   				 	<p id="min-label-x" class="axis-label">0</p>
+							<canvas id="data_plotter" width="228px">
+							</canvas>
+						</td>
+		   				<td>
+		   					<p id="max-label-x" class="axis-label">100</p>
+    	   				 	<p id="min-label-x" class="axis-label">0</p>
+							<canvas id="data_plotter" class="hourly" width="228px">
+							</canvas>
+						</td>
+    	   			</tr>
+        		</table>
+        		<!-- a little explanation of the colors (see stylesheet)-->
+        		<ul class="legend">
+					<li class="dht0_h">Greenhouse Humidity</li><!--please, don't use yellow-->
+					<li class="dht0_t">Greenhouse Temperature</li>
+					<li class="dht1_h">Room Humidity</li>
+					<li class="dht1_t">Room Temperature</li>
+					<li class="water_t">Water Temperature</li>
+				</ul>
+			</div>
+
+		</div>
+		<div id="footer">			
+		</div>
+		<div id="copyright">
+		<p class="center">&copy; &nbsp; BabyLawn</p>
+		</div>			
+		</div>
+</body>
+<span class="var_container">
+	<p>Pump:
+		<span id="PUMP" class="HTMLvars"></span></p>	
+	<p>FINT:
+		<span id="FINT" class="HTMLvars"></span></p>		
+	<p>FEXT:
+    	<span id="FEXT" class="HTMLvars">
+    	</span>
+    </p>
+	<p>Water Temperature:
+		<span id="water_t" class="HTMLvars">
+		</span>
+	</p>
+	<p>DHT0 Greenhouse Temperature:
+		<span id="dht0_t" class="HTMLvars">
+		</span>
+	</p>
+	<p>DHT0 Greenhouse RH:
+		<span id="dht0_h" class="HTMLvars">
+		</span>
+		</p>
+	<p>DHT1 Room temperature:
+		<span id="dht1_t" class="HTMLvars">
+		</span>
+	</p>
+	<p>DHT1 Room RH:
+		<span id="dht1_h" class="HTMLvars">
+		</span>
+	</p>
+	<p>Light Status:
+	  	<span id="LIGHT" class="HTMLvars">
+	  	</span>
+	</p>  	
+	<p>IP Address
+	  	<span id="IP" class="HTMLvars">
+	  	</span>
+	</p>
+	<p>startTime:
+		<span id="startTime" class="HTMLvars">
+		</span>
+	</p>
+	<p>endTime:
+		<span id="endTime" class="HTMLvars">
+		</span>
+	</p>
+	<p>Time synchronisation status:
+		<span id="NTP" class="HTMLvars">
+		</span>
+	</p>
+	<p>Time:
+		<span id="time" class="HTMLvars">
+		</span>
+	</p>		
+	<p>RTC Sync:
+		<span id="RTC" class="HTMLvars">
+		</span>
+	</p>		
+	<p>local Time zone Offset:
+		<span id="GMTOffset" class="HTMLvars">
+		</span>
+	</p>
+</span>
+<script type="text/javascript">
+	window.setInterval("getData()",1000);
+	var xmlhttp = new XMLHttpRequest();
+	var url = "http://10.0.1.3";
+	var myArr;
 	
-	<body onLoad="ArduinoReader.Start()">
-		<div class="input address" ><label>Address:</label><input class="address" type="text" value="http://10.0.1.3" onChange="ArduinoReader.SetAddress(this)" /></div>
-		<canvas id="data_plotter">
-        </canvas>
-	</body>
+	//xmlhttp connection	
+	xmlhttp.onreadystatechange = function() {
+		if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+			var myArr = JSON.parse(xmlhttp.responseText);
+			getArray(myArr);
+			refreshGauges(myArr);
+			calcLocalDate(myArr);
+			}
+		};
+	// put array from xmlhttp connection in to htmlvars	
+	function getArray(arr) {
+		document.getElementById("PUMP").innerHTML		=	arr.PUMP;
+		document.getElementById("FINT").innerHTML		=	arr.FINT;
+		document.getElementById("FEXT").innerHTML		=	arr.FEXT;
+		document.getElementById("LIGHT").innerHTML		=	arr.LIGHT;
+		document.getElementById("IP").innerHTML			=	arr.IP;
+		document.getElementById("time").innerHTML		=	arr.time;
+		document.getElementById("NTP").innerHTML		=	arr.NTP;
+		document.getElementById("water_t").innerHTML	=	arr.water_t;
+		document.getElementById("dht0_h").innerHTML		=	arr.dht0_h;
+		document.getElementById("dht0_t").innerHTML		=	arr.dht0_t;
+		document.getElementById("dht1_h").innerHTML		=	arr.dht1_h;
+		document.getElementById("dht1_t").innerHTML		=	arr.dht1_t;
+		document.getElementById("startTime").innerHTML	=	arr.startTime;
+		document.getElementById("endTime").innerHTML	=	arr.endTime;
+		document.getElementById("RTC").innerHTML		=	arr.RTC;
+		//document.getElementById("time").innerHTML		=	arr.time;
+		};
+		
+	//calculate the date based on timezone, using array from xmlhttp connection
+	function calcLocalDate(arr) {
+		var utcSeconds = arr.time;
+		var d = new Date(0); // The 0 there is the key, which sets the date to the epoch
+		d.setUTCSeconds(utcSeconds);
+		document.getElementById("time").innerHTML		=	d;
+		}
+	
+	function setCheckBox() {
+		var v = document.getElementbyId("FINT");
+		v.innerHTML = newvalue;
+		}
+	
+	function getData() {
+		xmlhttp.open("GET",url,true);
+		xmlhttp.send();
+		}
+		
+	function refreshGauges(arr) {
+	var GreenHouseTemp = arr.dht0_t;
+	GreenHouseTempGauge.refresh(GreenHouseTemp)
+	
+	var GreenHouseRH = arr.dht0_h;
+	GreenHouseRHGauge.refresh(GreenHouseRH)
+	
+	var RoomTemp = arr.dht1_t;
+	RoomTempGauge.refresh(RoomTemp)
+	
+	var RoomRH = arr.dht1_h;
+	RoomRHGauge.refresh(RoomRH)
+	
+	var WaterTemp = arr.water_t;
+	WaterTempGauge.refresh(WaterTemp)
+	}		
+	var GreenHouseTempGauge = new JustGage({
+		id: "GreenHouseTempGauge",
+		startAnimationTime: 1,
+        startAnimationType: "linear",
+        refreshAnimationTime: 1,
+        refreshAnimationType: "linear",
+		value: 0,
+		min: 0,
+		max: 26,
+		title: "GreenHouseTemp",
+		gaugeWidthScale: 0.33
+        });
+	
+	var GreenHouseRHGauge = new JustGage({
+		id: "GreenHouseRHGauge",
+	    startAnimationTime: 1,
+        startAnimationType: "linear",
+        refreshAnimationTime: 1,
+        refreshAnimationType: "linear",
+		value: 0,
+		min: 0,
+		max: 100,
+		title: "GreenHouseRH",
+		gaugeWidthScale: 0.33
+        });
+        
+    var RoomTempGauge = new JustGage({
+		id: "RoomTempGauge",
+        startAnimationTime: 1,
+        startAnimationType: "linear",
+        refreshAnimationTime: 1,
+        refreshAnimationType: "linear",
+		value: 0,
+		min: 0,
+		max: 45,
+		title: "RoomTemp",
+		gaugeWidthScale: 0.33
+        });
+	
+	var RoomRHGauge = new JustGage({
+		id: "RoomRHGauge",
+        startAnimationTime: 1,
+        startAnimationType: "linear",
+        refreshAnimationTime: 1,
+        refreshAnimationType: "linear",
+		value: 0,
+		min: 0,
+		max: 100,
+		title: "RoomRH",
+		gaugeWidthScale: 0.33
+        });
+        
+    var WaterTempGauge = new JustGage({
+		id: "WaterTempGauge",
+        startAnimationTime: 1,
+        startAnimationType: "linear",
+        refreshAnimationTime: 1,
+        refreshAnimationType: "linear",
+		value: 0,
+		min: 22,
+		max: 32,
+		title: "WaterTemp",
+		levelColors: [
+          "#00fff6",
+          "#ff00fc",
+          "#1200ff"
+          ],
+          gaugeWidthScale: 0.33
+        });
+
+</script>
 </html>
