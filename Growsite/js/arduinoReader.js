@@ -1,4 +1,3 @@
-
 var ArduinoReader = null;       // Namespace voor de arduino reader
 var DataPlotter = null;         // Namespace voor de data plotter
 
@@ -75,7 +74,11 @@ function dataPlotter(){
 		lastdata = null;
 	
 	function construct(){
-		canvas = document.getElementById("data_plotter");
+		canvas = document.getElementByClassname("weekly");
+		resize_canvas();
+		canvas = document.getElementByClassname("daily");
+		resize_canvas();
+		canvas = document.getElementByClassname("hourly");
 		resize_canvas();
 		
 		window.addEventListener("resize", function(){
@@ -87,25 +90,26 @@ function dataPlotter(){
 		var w = window.innerWidth-20;
 		var h = window.innerHeight-370;
 		if(h>400)h=400;
-		canvas.width = w;
+		
 		canvas.height = 400;
+		canvas.width= auto;
 	}
 	
 	Me.PlotData = function(data){
 		var ctx = canvas.getContext("2d");
-		ctx.fillStyle="#ffffff";
+		ctx.fillStyle="rgba(0, 0, 0, 0.0)";
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
-		
-		ctx.strokeStyle = "#ff0000";
-		drawForKey(ctx, data, "water_t");
-		ctx.strokeStyle = "#ffff00";
+		ctx.lineWidth=1;
+		ctx.strokeStyle = "#ffb400";
 		drawForKey(ctx, data, "dht0_h");
 		ctx.strokeStyle = "#00ff00";
 		drawForKey(ctx, data, "dht0_t");
 		ctx.strokeStyle = "#00ffff";
 		drawForKey(ctx, data, "dht1_h");
-		ctx.strokeStyle = "#0000ff";
+		ctx.strokeStyle = "#aaa";
 		drawForKey(ctx, data, "dht1_t");
+		ctx.strokeStyle = "#03acff";
+		drawForKey(ctx, data, "water_t");
 	}
 	
 	function drawForKey(ctx, data, key){
